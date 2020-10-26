@@ -67,6 +67,7 @@ class PaperboyClient {
   unsubscribe() {
     this.subscribed = false;
     this.ws.close();
+    clearInterval(this._scheduleSocketMaintainanceInterval);
   }
 
 }
