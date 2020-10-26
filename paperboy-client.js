@@ -1,8 +1,10 @@
 class PaperboyClient {
 
-  constructor(tokenBaseUrl, wsUrl) {
+  constructor(tokenBaseUrl, wsUrl, channel, msgHandler) {
     this.tokenBaseUrl = tokenBaseUrl;
     this.wsUrl = wsUrl;
+    this.channel = channel;
+    this.msgHandler = msgHandler;
     this.subscribed = false;
   }
 
@@ -15,24 +17,24 @@ class PaperboyClient {
         that.ws.close();
         if (that.subscribed === true) {
           console.log('Reconnecting as client was subscribed.');
-          that.subscribe(that.channel, that.msgHandler);
+          that.subscribe();
         }
       }
     }, 5000);
   }
 
-  _requestToken(channel, callback) {
+  _requestToken(callback) {
     const http = new XMLHttpRequest();
     http.onreadystatechange = function() {
       if (this.readyState == 4 && this.status == 200) {
         callback(http.responseText);
       }
     }
-    http.open('GET', this.tokenBaseUrl + channel);
+    http.open('GET', this.tokenBaseUrl + this.channel);
     http.send();
   }
 
-  _subscribe(token, msgHandler) {
+  _subscribe(token) {
     // TODO: use WSS for secure/encrypted ws channels
     const ws = new WebSocket(this.wsUrl);
     this.ws = ws;
@@ -50,18 +52,21 @@ class PaperboyClient {
         console.log('Subscribed to channel.');
         that.subscribed = true;
       } else {
-        msgHandler(e);
+        that.msgHandler(e);
       }
     };
   }
 
-  subscribe(channel, msgHandler) {
+  subscribe() {
     const that = this;
-    this.channel = channel;
-    this.msgHandler = msgHandler;
-    this._requestToken(channel, function callback(token) {
-      that._subscribe(token, msgHandler);
+    this._requestToken(function callback(token) {
+      that._subscribe(token);
     })
+  }
+
+  unsubscribe() {
+    this.subscribed = false;
+    this.ws.close();
   }
 
 }
