@@ -52,7 +52,8 @@ class PaperboyClient {
         console.log('Subscribed to channel.');
         that.subscribed = true;
       } else {
-        that.msgHandler(e);
+        const msg = JSON.parse(e.data);
+        that.msgHandler(msg);
       }
     };
   }
