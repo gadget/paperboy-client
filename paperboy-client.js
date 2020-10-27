@@ -13,7 +13,7 @@ class PaperboyClient {
     const that = this;
     this._scheduleSocketMaintainanceInterval = setInterval(() => {
       if (that.ws.readyState === 2 || that.ws.readyState === 3) {
-        console.log('Cleaning up WebSocket connection.');
+        console.log('Dead WebSocket connection.');
         that.ws.close();
         if (that.subscribed === true) {
           console.log('Reconnecting as client was subscribed.');
