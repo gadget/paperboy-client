@@ -73,8 +73,10 @@ class PaperboyClient {
   }
 
   unsubscribe(channel) {
+    if (this.ws != undefined) {
+      this.ws.send('unsubscribe:' + channel);
+    }
     this.subscriptions.delete(channel);
-    // TODO: send unsubscribe msg to websocket server where states should be unset
   }
 
 }
