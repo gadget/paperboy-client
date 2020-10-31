@@ -1,11 +1,9 @@
 class PaperboyClient {
 
-  constructor(tokenBaseUrl, wsUrl, channel, msgHandler) {
+  constructor(tokenBaseUrl, wsUrl) {
     this.tokenBaseUrl = tokenBaseUrl;
     this.wsUrl = wsUrl;
-    this.channel = channel;
-    this.msgHandler = msgHandler;
-    this.subscribed = false;
+    this.subscriptions = new Map();
   }
 
   _scheduleSocketMaintainance() {
@@ -15,60 +13,68 @@ class PaperboyClient {
       if (that.ws.readyState === 2 || that.ws.readyState === 3) {
         console.log('Dead WebSocket connection.');
         that.ws.close();
-        if (that.subscribed === true) {
+        if (that.subscriptions.size > 0) {
           console.log('Reconnecting as client was subscribed.');
-          that.subscribe();
+          for (let s of that.subscriptions.entries()) {
+            that.ws = undefined;
+            that.subscribe(s.key, s.value);
+          }
         }
       }
     }, 5000);
   }
 
-  _requestToken(callback) {
+  _requestToken(channel, callback) {
     const http = new XMLHttpRequest();
     http.onreadystatechange = function() {
       if (this.readyState == 4 && this.status == 200) {
         callback(http.responseText);
       }
     }
-    http.open('GET', this.tokenBaseUrl + this.channel);
+    http.open('GET', this.tokenBaseUrl + channel);
     http.send();
   }
 
-  _subscribe(token) {
+  _subscribe(token, msgHandler) {
     // TODO: use WSS for secure/encrypted ws channels
-    const ws = new WebSocket(this.wsUrl);
-    this.ws = ws;
-    const that = this;
-    ws.onopen = function() {
-      console.log('WebSocket opened.');
-      ws.send(token);
-      that._scheduleSocketMaintainance();
-    };
-    ws.onclose = function() {
-      console.log('WebSocket closed.');
-    };
-    ws.onmessage = function(e) {
-      if (e.data.length === 10 && e.data === 'subscribed') {
-        console.log('Subscribed to channel.');
-        that.subscribed = true;
-      } else {
-        const msg = JSON.parse(e.data);
-        that.msgHandler(msg);
-      }
-    };
+    if (this.ws === undefined) {
+      const ws = new WebSocket(this.wsUrl);
+      this.ws = ws;
+      const that = this;
+
+      ws.onopen = function() {
+        console.log('WebSocket opened.');
+        that.ws.send(token);
+        that._scheduleSocketMaintainance();
+      };
+      ws.onclose = function() {
+        console.log('WebSocket closed.');
+      };
+      ws.onmessage = function(e) {
+        if (e.data.length < 100 && e.data.startsWith('subscribed:')) {
+          const ch = e.data.substring(11);
+          console.log('Subscribed to channel: "%s".', ch);
+        } else {
+          const msg = JSON.parse(e.data);
+          that.subscriptions.get(msg.channel)(msg);
+        }
+      };
+    } else {
+      this.ws.send(token);
+    }
   }
 
-  subscribe() {
+  subscribe(channel, msgHandler) {
+    this.subscriptions.set(channel, msgHandler);
     const that = this;
-    this._requestToken(function callback(token) {
-      that._subscribe(token);
+    this._requestToken(channel, function callback(token) {
+      that._subscribe(token, msgHandler);
     })
   }
 
-  unsubscribe() {
-    this.subscribed = false;
-    this.ws.close();
-    clearInterval(this._scheduleSocketMaintainanceInterval);
+  unsubscribe(channel) {
+    this.subscriptions.delete(channel);
+    // TODO: send unsubscribe msg to websocket server where states should be unset
   }
 
 }
