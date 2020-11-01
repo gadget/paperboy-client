@@ -4,6 +4,7 @@ class PaperboyClient {
     this.tokenBaseUrl = tokenBaseUrl;
     this.wsUrl = wsUrl;
     this.subscriptions = new Map();
+    this.tokenBuffer = [];
   }
 
   _scheduleSocketMaintainance() {
@@ -60,14 +61,13 @@ class PaperboyClient {
   }
 
   subscribe(channel, msgHandler) {
-    const tokenBuffer = [];
     this.subscriptions.set(channel, msgHandler);
     const that = this;
     this._requestToken(channel, function callback(token) {
       if (that.ws === undefined) {
         that._openWebSocket(function callback() {
-          while (tokenBuffer.length > 0) {
-            that.ws.send(tokenBuffer.pop());
+          while (that.tokenBuffer.length > 0) {
+            that.ws.send(that.tokenBuffer.pop());
           }
           that.ws.send(token);
         });
@@ -75,7 +75,7 @@ class PaperboyClient {
         if (that.ws.readyState === 1) {
           that.ws.send(token);
         } else {
-          tokenBuffer.push(token);
+          that.tokenBuffer.push(token);
         }
       }
     })
